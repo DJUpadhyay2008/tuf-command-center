@@ -38,11 +38,13 @@ This document outlines feature proposals for **ASUS TUF Control Center**.
 
 ---
 
-### [ ] 5. 🌀 Custom Fan Curve Graph Editor
-- **Goal**: Visual fan curve customizer for ASUS embedded controller (`asusctl fan-curve`).
+### [x] 5. 🌀 Custom Fan Curve Graph Editor (COMPLETED v2.6)
+- **Goal**: Visual fan curve customizer for ASUS embedded controller (`asusctl fan-curve` / `asusd`).
 - **Functionality**:
-  - Interactive temperature vs PWM % curve points.
-  - Presets: *Stealth Quiet*, *Balanced Ramp*, *Aggressive Max Cooling*.
+  - 8-point interactive temperature vs PWM % curve vector graph canvas (`FanCurveGraphWidget`).
+  - Presets: *Stealth Quiet*, *Balanced Ramp*, *Aggressive Max Cooling*, *Reset Defaults*.
+  - Dual CPU & GPU fan control with `asusd` `/etc/asusd/fan_curves.ron` integration.
+
 
 ---
 
@@ -54,8 +56,9 @@ This document outlines feature proposals for **ASUS TUF Control Center**.
 
 ---
 
-### [ ] 7. ⌨️ Custom Hotkey & Fn Key Mapper
-- **Goal**: Map Fn key shortcuts to app functions.
+### [x] 8. 🖼️ GameVisual Display Color Profiles (COMPLETED v2.5)
+- **Goal**: Armoury Crate GameVisual screen color, contrast, and blue light profiles.
 - **Functionality**:
-  - Customize Fn+F5 (Fan Profile), Fn+F4 (Aura RGB), and Fn brightness keys to trigger GUI actions or OSD popups.
+  - 1-click presets: **Default**, **Racing**, **Scenery**, **RTS/RPG**, **FPS (Dark Boost)**, **Cinema**, **Eye Care (Blue Light Filter)**, **Vivid Color**.
+  - Dynamic `xrandr` gamma and color temperature tuning for ASUS display panels.
 

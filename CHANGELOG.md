@@ -1,6 +1,16 @@
 # Changelog - ASUS TUF Control Center
 
-## [2.1.0] - 2026-09-14
+## [2.6.0] - 2026-09-14
+
+### 🌀 New Features & Visual Fixes
+- ✅ **Custom Fan Curve Graph Editor**: Added 8-point vector graph canvas (`FanCurveGraphWidget`) under **🎛️ Manual Tuning**.
+  - Interactive drag-and-drop curve nodes with live tooltips.
+  - Dual CPU & GPU fan tuning across `Balanced`, `Performance`, and `Quiet` profiles.
+  - Presets: *Stealth Quiet*, *Balanced Ramp*, *Aggressive Max Cooling*, *Reset Defaults*.
+  - Native `asusd` `/etc/asusd/fan_curves.ron` reading & writing integration.
+- ✅ **GPU Graphics Mode Button Selection Highlighting**: Fixed missing stylesheet rules to highlight active GPU mode (`Integrated`, `Hybrid`, `Dedicated`) with glowing cyan borders and elevated background.
+
+## [2.5.0] - 2026-09-14
 
 ### 🔌 New Features
 - ✅ **Automatic AC / Battery Power Switcher**: Automatically switches profiles and display refresh rate when plugging/unplugging AC charger.

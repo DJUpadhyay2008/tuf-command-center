@@ -4,8 +4,8 @@ from PyQt6.QtWidgets import (
     QTabWidget, QSlider, QComboBox, QGroupBox, QProgressBar, QFrame,
     QColorDialog, QMessageBox, QGridLayout, QCheckBox, QScrollArea
 )
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QRectF, QPointF
+from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QBrush, QPainterPath, QLinearGradient
 from backend import AsusBackend
 
 STYLE_SHEET = """
@@ -100,6 +100,12 @@ QPushButton:hover {
 QPushButton:pressed {
     background-color: #38BDF8;
     color: #0F172A;
+}
+QPushButton#modeBtnSelected {
+    background-color: #0F2D3D;
+    border: 2px solid #38BDF8;
+    color: #38BDF8;
+    font-weight: bold;
 }
 
 /* Operating Mode Cards - High Contrast Color-Coded Themes */
@@ -223,6 +229,182 @@ QCheckBox::indicator:checked {
     border: 1px solid #38BDF8;
 }
 """
+
+class FanCurveGraphWidget(QWidget):
+    point_changed = pyqtSignal(int, int, int)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumHeight(250)
+        self.setMouseTracking(True)
+        self.points = [
+            [30, 15], [45, 25], [55, 40], [65, 55],
+            [75, 70], [80, 80], [85, 90], [90, 100]
+        ]
+        self.fan_name = "CPU Fan"
+        self.selected_idx = None
+        self.hovered_idx = None
+        self.margin_left = 45
+        self.margin_bottom = 35
+        self.margin_top = 20
+        self.margin_right = 25
+
+    def set_points(self, points_list, fan_name="CPU Fan"):
+        new_pts = []
+        for temp, pwm in points_list:
+            pct = round((pwm / 255.0) * 100) if pwm > 100 else pwm
+            new_pts.append([int(temp), int(pct)])
+        self.points = new_pts
+        self.fan_name = fan_name
+        self.update()
+
+    def get_points(self):
+        res = []
+        for temp, pct in self.points:
+            pwm_val = round((pct / 100.0) * 255)
+            res.append((temp, pwm_val))
+        return res
+
+    def _temp_pwm_to_pos(self, temp, pct):
+        w = self.width() - self.margin_left - self.margin_right
+        h = self.height() - self.margin_top - self.margin_bottom
+        x = self.margin_left + ((temp - 20) / 80.0) * w
+        y = self.height() - self.margin_bottom - (pct / 100.0) * h
+        return QPointF(x, y)
+
+    def _pos_to_temp_pwm(self, pos):
+        w = self.width() - self.margin_left - self.margin_right
+        h = self.height() - self.margin_top - self.margin_bottom
+        temp = 20 + ((pos.x() - self.margin_left) / w) * 80.0
+        pct = ((self.height() - self.margin_bottom - pos.y()) / h) * 100.0
+        return int(round(temp)), int(round(pct))
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        w = self.width()
+        h = self.height()
+        gx = self.margin_left
+        gy = self.margin_top
+        gw = w - self.margin_left - self.margin_right
+        gh = h - self.margin_top - self.margin_bottom
+
+        # Background
+        painter.setBrush(QBrush(QColor("#181D2A")))
+        painter.setPen(QPen(QColor("#2B3347"), 1))
+        painter.drawRoundedRect(0, 0, w, h, 8, 8)
+
+        # Grid lines
+        for pct in range(0, 101, 25):
+            y = h - self.margin_bottom - (pct / 100.0) * gh
+            painter.setPen(QPen(QColor("#252E42"), 1, Qt.PenStyle.DashLine))
+            painter.drawLine(int(gx), int(y), int(gx + gw), int(y))
+            painter.setPen(QPen(QColor("#64748B"), 1))
+            painter.setFont(QFont("Inter", 9))
+            painter.drawText(5, int(y) + 4, f"{pct}%")
+
+        for temp in range(30, 100, 10):
+            x = gx + ((temp - 20) / 80.0) * gw
+            painter.setPen(QPen(QColor("#252E42"), 1, Qt.PenStyle.DashLine))
+            painter.drawLine(int(x), int(gy), int(x), int(gy + gh))
+            painter.setPen(QPen(QColor("#64748B"), 1))
+            painter.setFont(QFont("Inter", 9))
+            painter.drawText(int(x) - 10, int(h - 10), f"{temp}°C")
+
+        # Title Label in Canvas
+        painter.setPen(QPen(QColor("#38BDF8"), 1))
+        painter.setFont(QFont("Inter", 10, QFont.Weight.Bold))
+        painter.drawText(int(gx + 10), int(gy + 18), f"{self.fan_name} Dynamic Fan Curve")
+
+        # Polygon path & gradient fill under curve
+        if self.points:
+            curve_path = QPainterPath()
+            p0 = self._temp_pwm_to_pos(*self.points[0])
+            curve_path.moveTo(p0)
+
+            pts_pos = [self._temp_pwm_to_pos(*pt) for pt in self.points]
+            for pt in pts_pos[1:]:
+                curve_path.lineTo(pt)
+
+            fill_path = QPainterPath(curve_path)
+            fill_path.lineTo(pts_pos[-1].x(), gy + gh)
+            fill_path.lineTo(pts_pos[0].x(), gy + gh)
+            fill_path.closeSubpath()
+
+            grad = QLinearGradient(0, gy, 0, gy + gh)
+            grad.setColorAt(0.0, QColor(56, 189, 248, 80))
+            grad.setColorAt(1.0, QColor(56, 189, 248, 5))
+            painter.fillPath(fill_path, QBrush(grad))
+
+            # Draw Main Curve Line
+            painter.setPen(QPen(QColor("#38BDF8"), 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
+            painter.drawPath(curve_path)
+
+            # Draw Node Points
+            for idx, pt in enumerate(self.points):
+                pos = self._temp_pwm_to_pos(*pt)
+                is_selected = (idx == self.selected_idx)
+                is_hovered = (idx == self.hovered_idx)
+
+                node_r = 7 if (is_selected or is_hovered) else 5
+                border_col = QColor("#F59E0B") if (is_selected or is_hovered) else QColor("#38BDF8")
+                fill_col = QColor("#FFF") if is_selected else QColor("#0F172A")
+
+                painter.setPen(QPen(border_col, 2))
+                painter.setBrush(QBrush(fill_col))
+                painter.drawEllipse(pos, float(node_r), float(node_r))
+
+                # Tooltip bubble on hover/drag
+                if is_selected or is_hovered:
+                    lbl = f"P{idx+1}: {pt[0]}°C → {pt[1]}%"
+                    painter.setFont(QFont("Inter", 9, QFont.Weight.Bold))
+                    painter.setPen(QPen(QColor("#0F172A")))
+                    painter.setBrush(QBrush(QColor("#F59E0B")))
+                    rect = QRectF(pos.x() - 45, pos.y() - 28, 90, 20)
+                    painter.drawRoundedRect(rect, 4, 4)
+                    painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, lbl)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            pos = event.position()
+            for idx, pt in enumerate(self.points):
+                pt_pos = self._temp_pwm_to_pos(*pt)
+                dist = (pos.x() - pt_pos.x())**2 + (pos.y() - pt_pos.y())**2
+                if dist <= 144:
+                    self.selected_idx = idx
+                    self.update()
+                    break
+
+    def mouseMoveEvent(self, event):
+        pos = event.position()
+        if self.selected_idx is not None:
+            temp, pct = self._pos_to_temp_pwm(pos)
+            pct = max(0, min(100, pct))
+            min_t = 20 if self.selected_idx == 0 else self.points[self.selected_idx-1][0] + 1
+            max_t = 100 if self.selected_idx == len(self.points)-1 else self.points[self.selected_idx+1][0] - 1
+            temp = max(min_t, min(max_t, temp))
+
+            self.points[self.selected_idx] = [temp, pct]
+            self.point_changed.emit(self.selected_idx, temp, pct)
+            self.update()
+        else:
+            prev_hover = self.hovered_idx
+            self.hovered_idx = None
+            for idx, pt in enumerate(self.points):
+                pt_pos = self._temp_pwm_to_pos(*pt)
+                dist = (pos.x() - pt_pos.x())**2 + (pos.y() - pt_pos.y())**2
+                if dist <= 144:
+                    self.hovered_idx = idx
+                    break
+            if prev_hover != self.hovered_idx:
+                self.update()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.selected_idx = None
+            self.update()
+
 
 class AsusGuiWindow(QMainWindow):
     def __init__(self):
@@ -570,11 +752,22 @@ class AsusGuiWindow(QMainWindow):
 
     # ---------------- TAB 2: MANUAL TUNING ----------------
     def _init_tab_manual(self):
-        layout = QVBoxLayout(self.tab_manual)
+        scroll = QScrollArea(self.tab_manual)
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(16)
 
+        scroll.setWidget(container)
+        tab_layout = QVBoxLayout(self.tab_manual)
+        tab_layout.setContentsMargins(0, 0, 0, 0)
+        tab_layout.addWidget(scroll)
+
         info_manual = QLabel(
-            "Manual Power Mode: Customize CPU sustained PL1, short burst PL2, and GPU Dynamic Boost power limits."
+            "Manual Power Mode: Customize CPU sustained PL1, short burst PL2, GPU Dynamic Boost, and Custom Fan Curves (asusd)."
         )
         info_manual.setWordWrap(True)
         info_manual.setStyleSheet("color: #10B981; font-size: 13px; font-weight: 600;")
@@ -640,7 +833,144 @@ class AsusGuiWindow(QMainWindow):
         cpu_layout.addWidget(btn_apply_pl2, 1, 3)
 
         layout.addWidget(cpu_power_group)
-        layout.addStretch()
+
+        # Custom Fan Curve Graph Editor Group
+        fan_group = QGroupBox("🌀 Custom Fan Curve Graph Editor (asusctl / asusd)")
+        fan_layout = QVBoxLayout(fan_group)
+        fan_layout.setSpacing(12)
+
+        # Controls header: Fan selector, Profile selector, Enable checkbox
+        fan_controls_layout = QHBoxLayout()
+
+        lbl_prof = QLabel("Profile:")
+        lbl_prof.setStyleSheet("font-weight: bold; color: #38BDF8;")
+        self.combo_fan_prof = QComboBox()
+        self.combo_fan_prof.addItems(["Balanced", "Performance", "Quiet"])
+        self.combo_fan_prof.currentTextChanged.connect(self._on_fan_profile_changed)
+
+        self.btn_fan_cpu = QPushButton("💻 CPU Fan")
+        self.btn_fan_gpu = QPushButton("🎮 GPU Fan")
+        self.btn_fan_cpu.setObjectName("modeBtnSelected")
+        
+        self.btn_fan_cpu.clicked.connect(lambda: self._select_fan_target("CPU"))
+        self.btn_fan_gpu.clicked.connect(lambda: self._select_fan_target("GPU"))
+
+        self.chk_fan_enabled = QCheckBox("Enable Custom Fan Curve")
+        self.chk_fan_enabled.stateChanged.connect(self._on_fan_enabled_toggled)
+
+        fan_controls_layout.addWidget(lbl_prof)
+        fan_controls_layout.addWidget(self.combo_fan_prof)
+        fan_controls_layout.addWidget(self.btn_fan_cpu)
+        fan_controls_layout.addWidget(self.btn_fan_gpu)
+        fan_controls_layout.addStretch()
+        fan_controls_layout.addWidget(self.chk_fan_enabled)
+
+        fan_layout.addLayout(fan_controls_layout)
+
+        # Graph Widget
+        self.fan_graph = FanCurveGraphWidget()
+        fan_layout.addWidget(self.fan_graph)
+
+        # Presets & Apply Buttons
+        preset_layout = QHBoxLayout()
+        btn_preset_quiet = QPushButton("🤫 Stealth Quiet")
+        btn_preset_balanced = QPushButton("⚖️ Balanced Ramp")
+        btn_preset_aggro = QPushButton("🔥 Aggressive Cooling")
+        btn_preset_reset = QPushButton("🔄 Reset Factory")
+        btn_apply_fan = QPushButton("⚡ Apply Fan Curve")
+        btn_apply_fan.setStyleSheet("background-color: #0EA5E9; color: #FFFFFF; font-weight: bold;")
+
+        btn_preset_quiet.clicked.connect(lambda: self._apply_fan_preset("quiet"))
+        btn_preset_balanced.clicked.connect(lambda: self._apply_fan_preset("balanced"))
+        btn_preset_aggro.clicked.connect(lambda: self._apply_fan_preset("aggro"))
+        btn_preset_reset.clicked.connect(self._reset_fan_curve_defaults)
+        btn_apply_fan.clicked.connect(self._save_and_apply_fan_curve)
+
+        preset_layout.addWidget(btn_preset_quiet)
+        preset_layout.addWidget(btn_preset_balanced)
+        preset_layout.addWidget(btn_preset_aggro)
+        preset_layout.addWidget(btn_preset_reset)
+        preset_layout.addStretch()
+        preset_layout.addWidget(btn_apply_fan)
+
+        fan_layout.addLayout(preset_layout)
+        layout.addWidget(fan_group)
+
+        # Init fan curve data
+        self.active_fan_target = "CPU"
+        self.fan_curves_data = self.backend.get_fan_curves()
+        self._load_current_fan_curve_to_graph()
+
+    def _select_fan_target(self, target):
+        self.active_fan_target = target
+        if target == "CPU":
+            self.btn_fan_cpu.setObjectName("modeBtnSelected")
+            self.btn_fan_gpu.setObjectName("")
+        else:
+            self.btn_fan_cpu.setObjectName("")
+            self.btn_fan_gpu.setObjectName("modeBtnSelected")
+        self.btn_fan_cpu.setStyle(self.btn_fan_cpu.style())
+        self.btn_fan_gpu.setStyle(self.btn_fan_gpu.style())
+        self._load_current_fan_curve_to_graph()
+
+    def _on_fan_profile_changed(self, prof_text):
+        self._load_current_fan_curve_to_graph()
+
+    def _load_current_fan_curve_to_graph(self):
+        prof = self.combo_fan_prof.currentText().lower()
+        fan_info = self.fan_curves_data.get(prof, {}).get(self.active_fan_target, {})
+        temps = fan_info.get("temp", [57, 59, 62, 67, 70, 73, 75, 77])
+        pwms = fan_info.get("pwm", [40, 66, 84, 84, 109, 147, 155, 181])
+        enabled = fan_info.get("enabled", False)
+
+        pts = list(zip(temps, pwms))
+        self.fan_graph.set_points(pts, f"{self.active_fan_target} Fan ({self.combo_fan_prof.currentText()})")
+        self.chk_fan_enabled.blockSignals(True)
+        self.chk_fan_enabled.setChecked(enabled)
+        self.chk_fan_enabled.blockSignals(False)
+
+    def _on_fan_enabled_toggled(self, state):
+        prof = self.combo_fan_prof.currentText().lower()
+        if prof in self.fan_curves_data and self.active_fan_target in self.fan_curves_data[prof]:
+            self.fan_curves_data[prof][self.active_fan_target]["enabled"] = (state == 2 or state == True)
+
+    def _apply_fan_preset(self, preset_name):
+        if preset_name == "quiet":
+            temps = [30, 45, 55, 65, 72, 78, 83, 90]
+            pwms = [0, 25, 51, 89, 115, 140, 165, 191] # 0..255
+        elif preset_name == "balanced":
+            temps = [30, 45, 55, 65, 72, 78, 83, 90]
+            pwms = [38, 64, 102, 140, 178, 204, 230, 255]
+        elif preset_name == "aggro":
+            temps = [30, 45, 55, 65, 70, 75, 80, 85]
+            pwms = [64, 102, 153, 204, 255, 255, 255, 255]
+        pts = list(zip(temps, pwms))
+        self.fan_graph.set_points(pts, f"{self.active_fan_target} Fan ({self.combo_fan_prof.currentText()})")
+
+    def _reset_fan_curve_defaults(self):
+        self.fan_curves_data = self.backend.DEFAULT_FAN_CURVES
+        self._load_current_fan_curve_to_graph()
+
+    def _save_and_apply_fan_curve(self):
+        prof = self.combo_fan_prof.currentText().lower()
+        pts = self.fan_graph.get_points()
+        temps = [p[0] for p in pts]
+        pwms = [p[1] for p in pts]
+        is_en = self.chk_fan_enabled.isChecked()
+
+        if prof not in self.fan_curves_data:
+            self.fan_curves_data[prof] = {}
+        self.fan_curves_data[prof][self.active_fan_target] = {
+            "temp": temps,
+            "pwm": pwms,
+            "enabled": is_en
+        }
+
+        ok, msg = self.backend.save_fan_curves(self.fan_curves_data)
+        if ok:
+            self.show_status(f"Fan Curve saved & applied for {self.active_fan_target} ({prof.capitalize()})! {msg}")
+        else:
+            self.show_status(f"Failed to save fan curve: {msg}", is_error=True)
 
     def _apply_dyn_boost(self):
         val = self.slider_dyn_boost.value()
@@ -669,10 +999,60 @@ class AsusGuiWindow(QMainWindow):
         else:
             self.show_status(f"Failed to set CPU PL2: {out}", is_error=True)
 
+
     # ---------------- TAB 3: RGB LIGHTING & SCREEN ----------------
     def _init_tab_lighting(self):
-        layout = QVBoxLayout(self.tab_lighting)
-        layout.setSpacing(16)
+        scroll = QScrollArea(self.tab_lighting)
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        
+        container = QWidget()
+        scroll.setWidget(container)
+        
+        tab_layout = QVBoxLayout(self.tab_lighting)
+        tab_layout.setContentsMargins(0, 0, 0, 0)
+        tab_layout.addWidget(scroll)
+        
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(14)
+
+        # GameVisual Display Profiles Card
+        gv_group = QGroupBox("GameVisual Display Modes")
+        gv_layout = QVBoxLayout(gv_group)
+        gv_layout.setSpacing(10)
+
+        gv_grid = QGridLayout()
+        gv_grid.setSpacing(8)
+
+        gv_modes = [
+            ("Default", "🎯 Default"),
+            ("Racing", "🏎️ Racing"),
+            ("Scenery", "🏞️ Scenery"),
+            ("RTS/RPG", "⚔️ RTS/RPG"),
+            ("FPS", "🎯 FPS (Dark Boost)"),
+            ("Cinema", "🎬 Cinema"),
+            ("Eye Care", "👁️ Eye Care"),
+            ("Vivid", "🎨 Vivid Color")
+        ]
+
+        self.gv_buttons = {}
+        for idx, (m_key, m_label) in enumerate(gv_modes):
+            row = idx // 4
+            col = idx % 4
+            btn = QPushButton(m_label)
+            btn.setMinimumHeight(36)
+            btn.clicked.connect(lambda _, k=m_key: self._set_gamevisual_mode(k))
+            gv_grid.addWidget(btn, row, col)
+            self.gv_buttons[m_key] = btn
+
+        gv_layout.addLayout(gv_grid)
+
+        self.lbl_gv_desc = QLabel("GameVisual: Select a display color profile to enhance screen contrast, saturation and eye care.")
+        self.lbl_gv_desc.setStyleSheet("color: #94A3B8; font-size: 11px; font-style: italic;")
+        gv_layout.addWidget(self.lbl_gv_desc)
+
+        layout.addWidget(gv_group)
 
         # Keyboard Backlight Brightness
         bright_group = QGroupBox("Keyboard Backlight Brightness")
@@ -757,6 +1137,26 @@ class AsusGuiWindow(QMainWindow):
         layout.addWidget(panel_group)
 
         layout.addStretch()
+
+    def _set_gamevisual_mode(self, mode_name):
+        ok, msg = self.backend.set_gamevisual_mode(mode_name)
+        if ok:
+            self.show_status(msg)
+            profile = self.backend.GAMEVISUAL_PROFILES.get(mode_name, {})
+            if hasattr(self, "lbl_gv_desc"):
+                self.lbl_gv_desc.setText(f"GameVisual [{mode_name}]: {profile.get('desc', '')}")
+            self._update_gv_buttons(mode_name)
+        else:
+            self.show_status(f"GameVisual Error: {msg}", is_error=True)
+
+    def _update_gv_buttons(self, active_mode):
+        for key, btn in self.gv_buttons.items():
+            if key.lower() == active_mode.lower():
+                btn.setObjectName("modeBtnSelected")
+                btn.setStyle(btn.style())
+            else:
+                btn.setObjectName("")
+                btn.setStyle(btn.style())
 
     def _set_kbd_bright(self, level):
         ok, out = self.backend.set_kbd_brightness(level)

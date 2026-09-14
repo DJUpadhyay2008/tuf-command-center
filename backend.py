@@ -343,6 +343,125 @@ class AsusBackend:
         ok, out = self._run_cmd(cmd)
         return ok, out
 
+    # --- GameVisual Display Color Profiles ---
+    GAMEVISUAL_PROFILES = {
+        "Default": {"gamma": "1.0:1.0:1.0", "brightness": "1.0", "desc": "Balanced settings for daily tasks and web browsing."},
+        "Racing": {"gamma": "1.05:1.05:1.1", "brightness": "1.0", "desc": "Optimized clarity for fast-paced racing and action games."},
+        "Scenery": {"gamma": "1.1:1.1:1.05", "brightness": "1.05", "desc": "Enhances brightness, contrast lines, and vivid color saturation."},
+        "RTS/RPG": {"gamma": "0.95:0.95:1.05", "brightness": "1.05", "desc": "Sharpens contrast and color performance for strategy and RPG games."},
+        "FPS": {"gamma": "1.25:1.25:1.25", "brightness": "1.15", "desc": "Boosts dark scene visibility so you can spot enemies in dark corners."},
+        "Cinema": {"gamma": "0.9:0.9:0.95", "brightness": "1.02", "desc": "Enhances color saturation and deep contrast for movies and videos."},
+        "Eye Care": {"gamma": "1.0:0.85:0.65", "brightness": "0.95", "desc": "Reduces blue light emissions to lower eye strain during long sessions."},
+        "Vivid": {"gamma": "1.15:1.15:1.1", "brightness": "1.08", "desc": "Vivid color saturation boost for vibrant visuals."}
+    }
+
+    def set_gamevisual_mode(self, mode_name):
+        profile = self.GAMEVISUAL_PROFILES.get(mode_name, self.GAMEVISUAL_PROFILES["Default"])
+        cmd = ["xrandr", "--output", "eDP-1", "--gamma", profile["gamma"], "--brightness", profile["brightness"]]
+        ok, out = self._run_cmd(cmd)
+        if ok:
+            return True, f"GameVisual profile '{mode_name}' applied. ({profile['desc']})"
+        return False, out
+
+    # --- Custom Fan Curves (asusd fan_curves.ron) ---
+    DEFAULT_FAN_CURVES = {
+        "balanced": {
+            "CPU": {"temp": [57, 59, 62, 67, 70, 73, 75, 77], "pwm": [40, 66, 84, 84, 109, 147, 155, 181], "enabled": False},
+            "GPU": {"temp": [57, 59, 63, 66, 69, 72, 74, 77], "pwm": [33, 40, 63, 86, 94, 117, 170, 186], "enabled": False}
+        },
+        "performance": {
+            "CPU": {"temp": [30, 55, 59, 62, 65, 67, 70, 72], "pwm": [53, 84, 84, 109, 147, 155, 181, 198], "enabled": False},
+            "GPU": {"temp": [30, 55, 60, 63, 66, 69, 72, 74], "pwm": [35, 63, 86, 94, 117, 170, 186, 201], "enabled": False}
+        },
+        "quiet": {
+            "CPU": {"temp": [58, 61, 64, 67, 70, 73, 76, 76], "pwm": [40, 66, 84, 84, 109, 147, 147, 147], "enabled": False},
+            "GPU": {"temp": [58, 62, 65, 66, 69, 73, 77, 77], "pwm": [33, 40, 63, 86, 94, 117, 117, 117], "enabled": False}
+        }
+    }
+
+    def get_fan_curves(self):
+        ron_path = "/etc/asusd/fan_curves.ron"
+        if not os.path.exists(ron_path):
+            return self.DEFAULT_FAN_CURVES
+        try:
+            with open(ron_path, "r") as f:
+                content = f.read()
+            
+            curves = {}
+            for prof in ["balanced", "performance", "quiet"]:
+                curves[prof] = {}
+                # Match profile section
+                m_prof = re.search(rf"{prof}:\s*\[(.*?)\]\s*,", content, re.DOTALL)
+                if not m_prof:
+                    curves[prof] = self.DEFAULT_FAN_CURVES.get(prof, {})
+                    continue
+
+                prof_block = m_prof.group(1)
+                # Match fan blocks
+                fan_blocks = re.findall(r"\(\s*fan:\s*(CPU|GPU),\s*pwm:\s*\((.*?)\),\s*temp:\s*\((.*?)\),\s*enabled:\s*(true|false),?\s*\)", prof_block)
+                for fan_type, pwm_str, temp_str, enabled_str in fan_blocks:
+                    pwm_vals = [int(x.strip()) for x in pwm_str.split(",") if x.strip()]
+                    temp_vals = [int(x.strip()) for x in temp_str.split(",") if x.strip()]
+                    is_enabled = enabled_str.lower() == "true"
+                    curves[prof][fan_type] = {
+                        "pwm": pwm_vals,
+                        "temp": temp_vals,
+                        "enabled": is_enabled
+                    }
+            return curves if curves else self.DEFAULT_FAN_CURVES
+        except Exception:
+            return self.DEFAULT_FAN_CURVES
+
+    def save_fan_curves(self, curves_data):
+        ron_path = "/etc/asusd/fan_curves.ron"
+        ron_lines = ["(", "    profiles: ("]
+        
+        for prof in ["balanced", "performance", "quiet"]:
+            ron_lines.append(f"        {prof}: [")
+            prof_data = curves_data.get(prof, self.DEFAULT_FAN_CURVES.get(prof, {}))
+            for fan_type in ["CPU", "GPU"]:
+                fan_info = prof_data.get(fan_type, {"pwm": [40]*8, "temp": [50]*8, "enabled": False})
+                pwm_str = ", ".join(str(x) for x in fan_info["pwm"])
+                temp_str = ", ".join(str(x) for x in fan_info["temp"])
+                en_str = "true" if fan_info.get("enabled", False) else "false"
+                ron_lines.append("            (")
+                ron_lines.append(f"                fan: {fan_type},")
+                ron_lines.append(f"                pwm: ({pwm_str}),")
+                ron_lines.append(f"                temp: ({temp_str}),")
+                ron_lines.append(f"                enabled: {en_str},")
+                ron_lines.append("            ),")
+            ron_lines.append("        ],")
+        ron_lines.append("        custom: [],")
+        ron_lines.append("    ),")
+        ron_lines.append(")")
+        
+        ron_content = "\n".join(ron_lines) + "\n"
+
+        try:
+            with open(ron_path, "w") as f:
+                f.write(ron_content)
+            return True, "Fan curves saved to /etc/asusd/fan_curves.ron"
+        except PermissionError:
+            # Fallback: write using pkexec tee or user scratch
+            try:
+                proc = subprocess.run(["pkexec", "tee", ron_path], input=ron_content, text=True, capture_output=True)
+                if proc.returncode == 0:
+                    return True, "Fan curves saved to /etc/asusd/fan_curves.ron (via pkexec)"
+            except Exception:
+                pass
+            
+            # Save user local copy fallback
+            local_path = os.path.expanduser("~/.config/asusd_fan_curves.ron")
+            try:
+                with open(local_path, "w") as f:
+                    f.write(ron_content)
+                return True, f"Saved local fallback curve to {local_path} (root needed for system /etc/asusd/)"
+            except Exception as e:
+                return False, str(e)
+        except Exception as e:
+            return False, str(e)
+
 if __name__ == "__main__":
     b = AsusBackend()
     print("Backend ready. Plugged:", b.get_power_plugged_status(), "Refresh Rate:", b.get_refresh_rate())
+
