@@ -1,26 +1,30 @@
 # 🛡️ ASUS TUF Control Center (Linux)
 
-> A modern, fast, dark Cyberpunk Armoury Crate GUI for ASUS TUF & ROG Gaming Laptops on Linux (Ubuntu/Debian/Arch/Fedora).
+> A modern, fast, high-contrast Armoury Crate GUI for ASUS TUF & ROG Gaming Laptops on Linux (Ubuntu/Debian/Arch/Fedora).
 
-![ASUS TUF Control Center UI](screenshots/operating_mode.png)
+![ASUS TUF Control Center UI](screenshots/gpu_highlight.png)
 
 ---
 
 ## ❓ The Problem & Why This Exists
 
-If you own an ASUS TUF or ROG laptop on Linux, you know that `asusctl` and `supergfxctl` provide amazing terminal controls, but typing terminal commands every time you want to switch fan profiles, check GPU temperatures, or limit battery charge is messy and tedious. 
+If you own an ASUS TUF or ROG laptop on Linux, you know that `asusctl` and `supergfxctl` provide amazing terminal controls, but typing terminal commands every time you want to switch fan profiles, check GPU temperatures, adjust GameVisual display color profiles, or edit fan curves is tedious. 
 
 Furthermore, `rog-control-center` frequently panics on modern Ubuntu releases (due to Tokio async runtime conflicts).
 
-**ASUS TUF Control Center** was created to solve this exact problem: giving you a clean, sleek 1-click GUI that matches **Armoury Crate** operating modes, WhisperMode 2.0 quiet gaming, and physical hardware key integration—open-sourced for the Linux ASUS community!
+**ASUS TUF Control Center** was created to solve this exact problem: giving you a clean, sleek 1-click GUI that matches **Armoury Crate** operating modes, WhisperMode 2.0 quiet gaming, GameVisual display modes, interactive Fan Curve tuning, and physical hardware key integration—open-sourced for the Linux ASUS community!
 
 ---
 
 ## 📸 Screenshots & Showcase
 
-| 🎮 Armoury Crate Operating Modes & Telemetry | 🌈 RGB Lighting & Display Overdrive |
+| 🎮 Armoury Crate Operating Modes & Telemetry | 🌀 Custom Fan Curve Graph Editor & Power Limits |
 | :---: | :---: |
-| ![Operating Modes & Telemetry](screenshots/operating_mode.png) | ![RGB & Display Controls](screenshots/rgb_display.png) |
+| ![Operating Modes & GPU Mode Switcher](screenshots/gpu_highlight.png) | ![Custom Fan Curve Graph Editor](screenshots/fan_curve_scrolled.png) |
+
+| 🎨 GameVisual Color Profiles & Aura RGB | 🔋 Battery Health & Eco Charge Limit |
+| :---: | :---: |
+| ![GameVisual Color Profiles & Aura RGB](screenshots/gamevisual.png) | ![Battery Health Care](screenshots/battery_health.png) |
 
 ---
 
@@ -36,8 +40,17 @@ Furthermore, `rog-control-center` frequently panics on modern Ubuntu releases (d
   - **On AC Charger**: Auto-applies **Turbo Mode** + **144Hz Refresh Rate** + Unlimited FPS.
   - **On Battery Power**: Auto-applies **Silent Mode (Whisper 40 FPS)** + **60Hz Refresh Rate** for maximum battery life.
 
+- **🌀 Custom Fan Curve Graph Editor**:
+  - 8-point interactive temperature vs PWM % curve vector graph canvas (`FanCurveGraphWidget`).
+  - Presets: *Stealth Quiet*, *Balanced Ramp*, *Aggressive Max Cooling*, *Reset Defaults*.
+  - Dual CPU & GPU fan control with `asusd` `/etc/asusd/fan_curves.ron` integration.
+
+- **🎨 GameVisual Display Color Profiles**:
+  - 1-click Armoury Crate visual modes: **Default**, **Racing**, **Scenery**, **RTS/RPG**, **FPS (Dark Boost)**, **Cinema**, **Eye Care (Blue Light Filter)**, **Vivid Color**.
+  - Dynamic `xrandr` gamma & brightness tuning for ASUS laptop screens.
+
 - **⚡ GPU Graphics Mode Switcher**:
-  - Switch between **Integrated (iGPU)**, **Hybrid (Optimus)**, and **Dedicated (MUX)** graphics via `supergfxctl`.
+  - Switch between **Integrated (iGPU)**, **Hybrid (Optimus)**, and **Dedicated (MUX)** graphics via `supergfxctl` with active mode button selection highlighting.
 
 - **🌈 RGB Aura Lighting & Screen Overdrive**:
   - Keyboard backlight brightness levels (Off, Low, Medium, High).
