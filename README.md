@@ -2,7 +2,7 @@
 
 > A modern, fast, dark Cyberpunk Armoury Crate GUI for ASUS TUF & ROG Gaming Laptops on Linux (Ubuntu/Debian/Arch/Fedora).
 
-![ASUS TUF Control Center UI](screenshots/terminal_ui.png)
+![ASUS TUF Control Center UI](screenshots/operating_mode.png)
 
 ---
 
@@ -18,9 +18,9 @@ Furthermore, `rog-control-center` frequently panics on modern Ubuntu releases (d
 
 ## 📸 Screenshots & Showcase
 
-| Operating Modes & Telemetry | Terminal Cyberpunk Aesthetics |
+| 🎮 Armoury Crate Operating Modes & Telemetry | 🌈 RGB Lighting & Display Overdrive |
 | :---: | :---: |
-| ![Dashboard Monitor](screenshots/dashboard.png) | ![Terminal UI](screenshots/terminal_ui.png) |
+| ![Operating Modes & Telemetry](screenshots/operating_mode.png) | ![RGB & Display Controls](screenshots/rgb_display.png) |
 
 ---
 
