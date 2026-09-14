@@ -1,15 +1,12 @@
 import sys
-import logging
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTabWidget, QSlider, QComboBox, QGroupBox, QProgressBar, QFrame,
     QColorDialog, QMessageBox, QGridLayout
 )
-from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor, QFont
 from backend import AsusBackend
-
-logger = logging.getLogger(__name__)
 
 STYLE_SHEET = """
 QMainWindow {
@@ -133,20 +130,7 @@ QComboBox QAbstractItemView {
 class AsusGuiWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        
-        try:
-            self.backend = AsusBackend()
-        except RuntimeError as e:
-            QMessageBox.critical(
-                None, 
-                "Dependency Error",
-                f"Failed to initialize ASUS Control Backend:\n\n{str(e)}\n\n"
-                "Please ensure 'asusctl' and 'supergfxctl' are installed.\n\n"
-                "Arch/Manjaro: sudo pacman -S asusctl supergfxctl\n"
-                "Ubuntu/Debian: sudo apt install asusctl supergfxctl"
-            )
-            sys.exit(1)
-        
+        self.backend = AsusBackend()
         self.active_mode = "Performance"
         self.setWindowTitle("ASUS TUF Control Center [TERMINAL MODE]")
         self.setMinimumSize(900, 720)
@@ -341,23 +325,31 @@ class AsusGuiWindow(QMainWindow):
 
     def _show_fps_help_dialog(self):
         msg = QMessageBox(self)
-        try:
-            self.active_mode = mode_name
-            ok, msg = self.backend.apply_operating_mode(mode_name)
-            if ok:
-                self.show_status(f"Operating Mode set to {mode_name}: {msg}")
-                self._update_mode_card_styles(mode_name)
-                self._update_fps_combo_selection()
-                if mode_name == "Manual":
-                    self.tabs.setCurrentIndex(1)
-                else:
-                    self.refresh_manual_sliders_from_armoury()
+        msg.setWindowTitle("Game FPS Limiter Setup Info")
+        msg.setText(
+            "<b>How Game FPS Limiting Works:</b><br><br>"
+            "1. <b>Proton / Windows Games (RDR2, Cyberpunk, Witcher 3):</b><br>"
+            "   The 40 FPS / 60 FPS cap applies <i>automatically</i> via <b>DXVK</b> configuration (~/.config/dxvk.conf)!<br><br>"
+            "2. <b>Native Vulkan/OpenGL Games (CS2):</b><br>"
+            "   In Steam Game Properties -> Launch Options, add:<br>"
+            "   <code>mangohud %command%</code><br><br>"
+            "This forces the game to cap at 40 FPS in Silent Mode, keeping your CPU & GPU under 60°C with quiet fans!"
+        )
+        msg.exec()
+
+    def _select_operating_mode(self, mode_name):
+        self.active_mode = mode_name
+        ok, msg = self.backend.apply_operating_mode(mode_name)
+        if ok:
+            self.show_status(f"Operating Mode set to {mode_name}: {msg}")
+            self._update_mode_card_styles(mode_name)
+            self._update_fps_combo_selection()
+            if mode_name == "Manual":
+                self.tabs.setCurrentIndex(1)
             else:
-                self.show_status(f"Failed to set mode: {msg}", is_error=True)
-                QMessageBox.warning(self, "Mode Change Failed", f"Could not apply {mode_name} mode:\n{msg}")
-        except Exception as e:
-            logger.error(f"Error applying mode {mode_name}: {e}")
-            self.show_status(f"Error: {str(e)}", is_error=True)
+                self.refresh_manual_sliders_from_armoury()
+        else:
+            self.show_status(f"Failed to set mode: {msg}", is_error=True)
 
     def _apply_manual_fps_cap(self):
         val_str = self.combo_fps.currentText()
@@ -490,43 +482,31 @@ class AsusGuiWindow(QMainWindow):
 
         # CPU PL2
         cpu_layout.addWidget(QLabel("CPU PL2 Short Burst Limit:"), 1, 0)
-        try:
-            val = self.slider_dyn_boost.value()
-            ok, out = self.backend.set_nv_dynamic_boost(val)
-            if ok:
-                self._select_operating_mode("Manual")
-                self.show_status(f"Manual Mode: NV Dynamic Boost set to {val} W")
-            else:
-                self.show_status(f"Failed to set Dynamic Boost: {out}", is_error=True)
-        except Exception as e:
-            logger.error(f"Error setting dynamic boost: {e}")
-            self.show_status(f"Error: {str(e)}", is_error=True)
+        self.slider_pl2 = QSlider(Qt.Orientation.Horizontal)
+        self.slider_pl2.setRange(28, 135)
+        self.slider_pl2.setValue(135)
+        self.lbl_val_pl2 = QLabel("135 W")
+        self.lbl_val_pl2.setFixedWidth(45)
+        self.lbl_val_pl2.setStyleSheet("font-weight: bold; color: #00FF66;")
+        self.slider_pl2.valueChanged.connect(lambda v: self.lbl_val_pl2.setText(f"{v} W"))
+        btn_apply_pl2 = QPushButton("Apply PL2")
+        btn_apply_pl2.clicked.connect(self._apply_pl2)
 
-    def _apply_pl1(self):
-        try:
-            val = self.slider_pl1.value()
-            ok, out = self.backend.set_cpu_pl1(val)
-            if ok:
-                self._select_operating_mode("Manual")
-                self.show_status(f"Manual Mode: CPU PL1 limit set to {val} W")
-            else:
-                self.show_status(f"Failed to set CPU PL1: {out}", is_error=True)
-        except Exception as e:
-            logger.error(f"Error setting PL1: {e}")
-            self.show_status(f"Error: {str(e)}", is_error=True)
+        cpu_layout.addWidget(self.slider_pl2, 1, 1)
+        cpu_layout.addWidget(self.lbl_val_pl2, 1, 2)
+        cpu_layout.addWidget(btn_apply_pl2, 1, 3)
 
-    def _apply_pl2(self):
-        try:
-            val = self.slider_pl2.value()
-            ok, out = self.backend.set_cpu_pl2(val)
-            if ok:
-                self._select_operating_mode("Manual")
-                self.show_status(f"Manual Mode: CPU PL2 limit set to {val} W")
-            else:
-                self.show_status(f"Failed to set CPU PL2: {out}", is_error=True)
-        except Exception as e:
-            logger.error(f"Error setting PL2: {e}")
-            self.show_status(f"Error: {str(e)}", is_error=True)
+        layout.addWidget(cpu_power_group)
+        layout.addStretch()
+
+    def _apply_dyn_boost(self):
+        val = self.slider_dyn_boost.value()
+        ok, out = self.backend.set_nv_dynamic_boost(val)
+        if ok:
+            self._select_operating_mode("Manual")
+            self.show_status(f"Manual Mode: NV Dynamic Boost set to {val} W")
+        else:
+            self.show_status(f"Failed to set Dynamic Boost: {out}", is_error=True)
 
     def _apply_pl1(self):
         val = self.slider_pl1.value()
@@ -590,10 +570,10 @@ class AsusGuiWindow(QMainWindow):
 
         aura_layout.addLayout(mode_select_layout)
 
-        # Color Selection Swatches (Styled with matching terminal outlines)
+        # Color Selection Swatches
         color_layout = QHBoxLayout()
         self.current_color = "00FF66"
-        self.btn_pick_color = QPushButton("🎨 Pick Color")
+        self.btn_pick_color = QPushButton("Pick Color")
         self.btn_pick_color.setStyleSheet(f"background-color: #141724; color: #{self.current_color}; border: 1px solid #{self.current_color}; font-weight: bold;")
         self.btn_pick_color.clicked.connect(self._pick_color)
 
@@ -761,35 +741,39 @@ class AsusGuiWindow(QMainWindow):
         self.lbl_bat_status.setText(f"Battery Current Level: {t['battery_pct']} | Active Charge Limit: {self.slider_battery.value()}%")
 
     def refresh_manual_sliders_from_armoury(self):
-        try:
-            prof = self.backend.get_profile()
-            if prof.lower() == "quiet":
-                self.active_mode = "Silent"
-            elif prof.lower() == "balanced":
-                self.active_mode = "Performance"
-            elif prof.lower() == "turbo":
-                self.active_mode = "Turbo"
-            else:
-                self.active_mode = "Performance"
+        arm = self.backend.get_armoury_settings()
+        if "nv_dynamic_boost" in arm:
+            try:
+                self.slider_dyn_boost.setValue(int(arm["nv_dynamic_boost"]))
+            except Exception:
+                pass
+        if "ppt_pl1_spl" in arm:
+            try:
+                self.slider_pl1.setValue(int(arm["ppt_pl1_spl"]))
+            except Exception:
+                pass
+        if "ppt_pl2_sppt" in arm:
+            try:
+                self.slider_pl2.setValue(int(arm["ppt_pl2_sppt"]))
+            except Exception:
+                pass
 
-            self._update_mode_card_styles(self.active_mode)
-            self._update_fps_combo_selection()
+    def refresh_all_data(self):
+        prof = self.backend.get_profile()
+        if prof.lower() == "quiet":
+            self.active_mode = "Silent"
+        elif prof.lower() == "balanced":
+            self.active_mode = "Performance"
+        elif prof.lower() == "turbo":
+            self.active_mode = "Turbo"
+        else:
+            self.active_mode = "Performance"
 
-            gpu_m = self.backend.get_gpu_mode()
-            self._update_gpu_buttons(gpu_m)
-            self.lbl_gpu_pending.setText(f"Pending Action: {self.backend.get_gpu_pending_action()}")
+        self._update_mode_card_styles(self.active_mode)
+        self._update_fps_combo_selection()
 
-            limit = self.backend.get_battery_limit()
-            self.slider_battery.setValue(limit)
-
-            bright = self.backend.get_kbd_brightness()
-            self._update_kbd_buttons(bright)
-
-            self.refresh_manual_sliders_from_armoury()
-            self._update_telemetry()
-        except Exception as e:
-            logger.error(f"Error refreshing data: {e}")
-            self.show_status("Failed to load some system data", is_error=True)
+        gpu_m = self.backend.get_gpu_mode()
+        self._update_gpu_buttons(gpu_m)
         self.lbl_gpu_pending.setText(f"Pending Action: {self.backend.get_gpu_pending_action()}")
 
         limit = self.backend.get_battery_limit()
