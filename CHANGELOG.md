@@ -1,5 +1,15 @@
 # Changelog - ASUS TUF Control Center
 
+## [2.1.0] - 2026-09-14
+
+### 🔌 New Features
+- ✅ **Automatic AC / Battery Power Switcher**: Automatically switches profiles and display refresh rate when plugging/unplugging AC charger.
+  - **AC Charger Plugged In**: Auto-applies **Turbo Mode** + **144Hz Refresh Rate** + Unlimited FPS.
+  - **Running on Battery**: Auto-applies **Silent Mode (Whisper 40 FPS)** + **60Hz Refresh Rate** to maximize battery life.
+- ✅ **Display Refresh Rate Controls**: Integrated `xrandr` screen refresh rate switcher (`144.00Hz` vs `60.00Hz`).
+- ✅ **Robust sysfs AC/Battery Detection**: Added fallback chain for `ACAD`, `AC`, `BAT1`, `BAT0` sysfs paths to ensure 100% detection accuracy.
+- ✅ **UI Toggle Card**: Added `[AUTOMATIC_POWER_SWITCHER]` card with toggle checkbox on `[1] OPERATING_MODE` tab.
+
 ## [2.0.0] - 2026-09-14
 
 ### 🔴 Critical Fixes

@@ -2,7 +2,7 @@ import sys
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTabWidget, QSlider, QComboBox, QGroupBox, QProgressBar, QFrame,
-    QColorDialog, QMessageBox, QGridLayout
+    QColorDialog, QMessageBox, QGridLayout, QCheckBox
 )
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QColor, QFont
@@ -125,6 +125,22 @@ QComboBox QAbstractItemView {
     selection-background-color: #132A20;
     selection-color: #00FF66;
 }
+QCheckBox {
+    color: #00FF66;
+    font-weight: bold;
+    spacing: 8px;
+}
+QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+    border: 1px solid #1F2430;
+    border-radius: 3px;
+    background: #141724;
+}
+QCheckBox::indicator:checked {
+    background: #00FF66;
+    border: 1px solid #00FF66;
+}
 """
 
 class AsusGuiWindow(QMainWindow):
@@ -132,6 +148,7 @@ class AsusGuiWindow(QMainWindow):
         super().__init__()
         self.backend = AsusBackend()
         self.active_mode = "Performance"
+        self.last_power_plugged = self.backend.get_power_plugged_status()
         self.setWindowTitle("ASUS TUF Control Center [TERMINAL MODE]")
         self.setMinimumSize(900, 720)
         self.setStyleSheet(STYLE_SHEET)
@@ -272,6 +289,30 @@ class AsusGuiWindow(QMainWindow):
         mode_grid.addWidget(lbl_desc_manual, 3, 1)
 
         layout.addWidget(mode_group)
+
+        # Automatic AC / Battery Power Switcher Card
+        auto_group = QGroupBox("[AUTOMATIC_POWER_SWITCHER]")
+        auto_layout = QVBoxLayout(auto_group)
+        auto_layout.setSpacing(6)
+
+        auto_header = QHBoxLayout()
+        self.chk_auto_switcher = QCheckBox("Enable Auto AC / Battery Power & Refresh Rate Switcher")
+        self.chk_auto_switcher.setChecked(True)
+        self.chk_auto_switcher.setStyleSheet("font-weight: bold; color: #00FF66;")
+        auto_header.addWidget(self.chk_auto_switcher)
+
+        self.lbl_auto_status = QLabel("[AC: Turbo + 144Hz] <-> [BATTERY: Silent + 60Hz]")
+        self.lbl_auto_status.setStyleSheet("color: #F59E0B; font-size: 11px; font-weight: bold;")
+        auto_header.addStretch()
+        auto_header.addWidget(self.lbl_auto_status)
+        auto_layout.addLayout(auto_header)
+
+        lbl_auto_desc = QLabel("Auto-applies Silent Mode (Whisper 40 FPS) + 60Hz refresh rate on battery, and Turbo Mode + 144Hz on AC charger.")
+        lbl_auto_desc.setWordWrap(True)
+        lbl_auto_desc.setStyleSheet("color: #6B7280; font-size: 11px;")
+        auto_layout.addWidget(lbl_auto_desc)
+
+        layout.addWidget(auto_group)
 
         # WhisperMode 2.0 / FPS Limiter Bar
         fps_group = QGroupBox("[WHISPERMODE_2.0_FPS_LIMITER]")
@@ -738,7 +779,27 @@ class AsusGuiWindow(QMainWindow):
         self.lbl_cpu_temp.setText(f"CPU Temp: {t['cpu_temp']}")
         self.lbl_gpu_temp.setText(f"GPU Temp: {t['gpu_temp']} | Power Draw: {t['gpu_power']}")
 
-        self.lbl_bat_status.setText(f"Battery Current Level: {t['battery_pct']} | Active Charge Limit: {self.slider_battery.value()}%")
+        plugged_str = " (AC Plugged)" if t.get("power_plugged") else " (On Battery)"
+        self.lbl_bat_status.setText(f"Battery Level: {t['battery_pct']}{plugged_str} | Charge Limit: {self.slider_battery.value()}%")
+
+        # Automatic AC / Battery Power Switcher Logic
+        current_plugged = t.get("power_plugged", True)
+        if hasattr(self, "chk_auto_switcher") and self.chk_auto_switcher.isChecked():
+            if self.last_power_plugged is not None and current_plugged != self.last_power_plugged:
+                if current_plugged:
+                    self._select_operating_mode("Turbo")
+                    self.backend.set_refresh_rate(144)
+                    self.show_status("[AUTO-POWER] AC Plugged In -> Auto-applied Turbo Mode + 144Hz!")
+                    if hasattr(self, "lbl_auto_status"):
+                        self.lbl_auto_status.setText("Status: AC Plugged (Turbo + 144Hz Active)")
+                else:
+                    self._select_operating_mode("Silent")
+                    self.backend.set_refresh_rate(60)
+                    self.show_status("[AUTO-POWER] Running on Battery -> Auto-applied Silent Mode (Whisper 40 FPS) + 60Hz!")
+                    if hasattr(self, "lbl_auto_status"):
+                        self.lbl_auto_status.setText("Status: On Battery (Silent + 60Hz Active)")
+        
+        self.last_power_plugged = current_plugged
 
     def refresh_manual_sliders_from_armoury(self):
         arm = self.backend.get_armoury_settings()

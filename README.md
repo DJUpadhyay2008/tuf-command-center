@@ -32,6 +32,10 @@ Furthermore, `rog-control-center` frequently panics on modern Ubuntu releases (d
   - 🔥 **Turbo Mode**: Pushes hardware to maximum power limits (CPU PL1 90W, PL2 135W, Dynamic Boost 15W) with unlimited FPS.
   - ⚙️ **Manual Mode**: Unlocks custom sliders to fine-tune CPU PL1/PL2 & GPU Dynamic Boost power limits.
 
+- **🔌 Automatic AC / Battery Power & Refresh Rate Switcher**:
+  - **On AC Charger**: Auto-applies **Turbo Mode** + **144Hz Refresh Rate** + Unlimited FPS.
+  - **On Battery Power**: Auto-applies **Silent Mode (Whisper 40 FPS)** + **60Hz Refresh Rate** for maximum battery life.
+
 - **⚡ GPU Graphics Mode Switcher**:
   - Switch between **Integrated (iGPU)**, **Hybrid (Optimus)**, and **Dedicated (MUX)** graphics via `supergfxctl`.
 

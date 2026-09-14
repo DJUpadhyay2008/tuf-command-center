@@ -142,11 +142,12 @@ class AsusBackend:
             match = re.search(r"ChargeControlEndThreshold.*?(\d+)", out)
             if match:
                 return int(match.group(1))
-        try:
-            with open("/sys/class/power_supply/BAT0/charge_control_end_threshold", "r") as f:
-                return int(f.read().strip())
-        except Exception:
-            pass
+        for b_name in ["BAT1", "BAT0"]:
+            try:
+                with open(f"/sys/class/power_supply/{b_name}/charge_control_end_threshold", "r") as f:
+                    return int(f.read().strip())
+            except Exception:
+                pass
         return 80
 
     def set_battery_limit(self, limit):
@@ -291,9 +292,57 @@ class AsusBackend:
             "cpu_temp": cpu_temp,
             "gpu_temp": gpu_temp,
             "gpu_power": f"{gpu_info['power_draw']} W" if gpu_info['power_draw'] != "N/A" else "N/A",
-            "battery_pct": bat_pct
+            "battery_pct": bat_pct,
+            "power_plugged": self.get_power_plugged_status()
         }
+
+    # --- Power AC / Battery Status ---
+    def get_power_plugged_status(self):
+        try:
+            bat = psutil.sensors_battery()
+            if bat and bat.power_plugged is not None:
+                return bat.power_plugged
+        except Exception:
+            pass
+        
+        # Check sysfs AC adapter status
+        for ac in ["ACAD", "AC", "ADP1", "AC0"]:
+            path = f"/sys/class/power_supply/{ac}/online"
+            if os.path.exists(path):
+                try:
+                    with open(path, "r") as f:
+                        return f.read().strip() == "1"
+                except Exception:
+                    pass
+
+        # Check sysfs battery discharge status fallback
+        for b_name in ["BAT1", "BAT0"]:
+            path = f"/sys/class/power_supply/{b_name}/status"
+            if os.path.exists(path):
+                try:
+                    with open(path, "r") as f:
+                        return f.read().strip().lower() != "discharging"
+                except Exception:
+                    pass
+        return True
+
+    # --- Display Refresh Rate (xrandr eDP-1) ---
+    def get_refresh_rate(self):
+        ok, out = self._run_cmd(["xrandr"])
+        if ok:
+            for line in out.splitlines():
+                if "*" in line:
+                    match = re.search(r"(\d+\.\d+)\*", line)
+                    if match:
+                        return float(match.group(1))
+        return 144.0
+
+    def set_refresh_rate(self, rate):
+        rate_str = f"{float(rate):.2f}"
+        cmd = ["xrandr", "--output", "eDP-1", "--mode", "1920x1080", "--rate", rate_str]
+        ok, out = self._run_cmd(cmd)
+        return ok, out
 
 if __name__ == "__main__":
     b = AsusBackend()
-    print("Backend ready.")
+    print("Backend ready. Plugged:", b.get_power_plugged_status(), "Refresh Rate:", b.get_refresh_rate())
