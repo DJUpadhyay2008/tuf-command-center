@@ -1,12 +1,30 @@
 # 🛡️ ASUS TUF Control Center (Linux)
 
-> A modern, dark Cyberpunk Armoury Crate replacement GUI for ASUS TUF & ROG Gaming Laptops on Linux (Ubuntu/Debian/Arch/Fedora).
+> A modern, fast, dark Cyberpunk Armoury Crate GUI for ASUS TUF & ROG Gaming Laptops on Linux (Ubuntu/Debian/Arch/Fedora).
 
-Built with Python 3, PyQt6, `asusctl`, `supergfxctl`, and `nvidia-smi`.
+![ASUS TUF Control Center UI](screenshots/terminal_ui.png)
 
 ---
 
-## ⚡ Features
+## ❓ The Problem & Why This Exists
+
+If you own an ASUS TUF or ROG laptop on Linux, you know that `asusctl` and `supergfxctl` provide amazing terminal controls, but typing terminal commands every time you want to switch fan profiles, check GPU temperatures, or limit battery charge is messy and tedious. 
+
+Furthermore, `rog-control-center` frequently panics on modern Ubuntu releases (due to Tokio async runtime conflicts).
+
+**ASUS TUF Control Center** was created to solve this exact problem: giving you a clean, sleek 1-click GUI that matches **Armoury Crate** operating modes, WhisperMode 2.0 quiet gaming, and physical hardware key integration—open-sourced for the Linux ASUS community!
+
+---
+
+## 📸 Screenshots & Showcase
+
+| Operating Modes & Telemetry | Terminal Cyberpunk Aesthetics |
+| :---: | :---: |
+| ![Dashboard Monitor](screenshots/dashboard.png) | ![Terminal UI](screenshots/terminal_ui.png) |
+
+---
+
+## ⚡ Key Features
 
 - **🎮 Armoury Crate Operating Modes**:
   - 🤫 **Silent Mode (WhisperMode 2.0)**: Lowers CPU PL1 (35W) & GPU Dynamic Boost (5W), automatically caps game FPS to **40 FPS** via MangoHud & DXVK to keep CPU & GPU **under 60°C** with near-silent fans.
@@ -26,13 +44,12 @@ Built with Python 3, PyQt6, `asusctl`, `supergfxctl`, and `nvidia-smi`.
   - Battery charge threshold limit slider (20% to 100%) and quick eco presets (60%, 80%, 100%).
 
 - **⌨️ Physical Armoury Crate Hardware Key Support**:
-  - Dedicated hardware key integration to open the GUI when pressing the physical Armoury Crate button.
+  - Bound to the dedicated physical Armoury Crate top-row key on ASUS keyboards for instant access.
 
 ---
 
-## 🚀 Installation & Usage
+## 🚀 Quick Install & Setup
 
-### 1. Clone & Setup
 ```bash
 git clone https://github.com/YOUR_USERNAME/asus-tuf-control-center.git
 cd asus-tuf-control-center
@@ -40,12 +57,15 @@ chmod +x install.sh
 ./install.sh
 ```
 
-### 2. Launch
-- **Physical Key**: Press the dedicated **Armoury Crate button** on your keyboard.
-- **Application Menu**: Open **ASUS TUF Control Center** from your app launcher.
+### Launch Options
+- **Physical Key**: Press the dedicated **Armoury Crate key** on your keyboard.
+- **Application Menu**: Search **ASUS TUF Control Center** in your app launcher.
 - **Terminal**: Run `asus-tuf-gui`
 
 ---
+
+## 🤝 Contributing
+Contributions, issues, and feature requests are welcome! Feel free to check out the issues page if you want to contribute.
 
 ## 📜 License
 MIT License. Free and open source for the ASUS ROG / TUF Linux Community.
